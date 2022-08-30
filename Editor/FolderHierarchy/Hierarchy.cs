@@ -37,11 +37,11 @@ namespace Elevator89.BuildPresetter.FolderHierarchy
 					children.Add(asset);
 
 				if (lastSlashIndex == -1)
-					return new HierarchyAsset(assetPath, children);
+					return new HierarchyAsset(assetPath.GetHashCode(), assetPath, children); // Root item, assetPath is just its name
 
 				string assetName = assetPath.Substring(lastSlashIndex + 1);
 
-				asset = new HierarchyAsset(assetName, children);
+				asset = new HierarchyAsset(assetPath.GetHashCode(), assetName, children);
 				assetPath = assetPath.Substring(0, lastSlashIndex);
 			}
 		}
