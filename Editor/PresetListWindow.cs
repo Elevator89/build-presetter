@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEngine;
 using Elevator89.BuildPresetter.Data;
 using Elevator89.BuildPresetter.FolderHierarchy;
+using UnityEditor.IMGUI.Controls;
 
 namespace Elevator89.BuildPresetter
 {
@@ -12,7 +13,15 @@ namespace Elevator89.BuildPresetter
 	{
 		private static readonly GUILayoutOption[] EmptyLayoutOption = new GUILayoutOption[0];
 
+		[SerializeField] TreeViewState _treeViewState; // Serialized in the window layout file so it survives assembly reloading
+		StreamingAssetsTreeView _streamingAssetsTreeView;
+
 		private PresetList _presets;
+		private string[] _presetNames;
+
+		private int _selectedPresetIndex = -1;
+		private Preset _selectedPreset = null;
+		private HierarchyAsset _selectedPresetStreamingAssetsHierarchy = null;
 
 		private Vector2 _scrollPos;
 		private Vector2 _scrollPosScenes;
@@ -46,6 +55,19 @@ namespace Elevator89.BuildPresetter
 		private void OnEnable()
 		{
 			_presets = PresetList.Load();
+			_presetNames = _presets.AvailablePresets.Select(prst => prst.Name).ToArray();
+			_selectedPresetIndex = Array.IndexOf(_presetNames, _presets.ActivePresetName);
+			_selectedPreset = _presets.GetPreset(_presetNames[_selectedPresetIndex]);
+
+			// Check if it already exists (deserialized from window layout file or scriptable object)
+			if (_treeViewState == null)
+				_treeViewState = new TreeViewState();
+
+			if (_streamingAssetsTreeView == null)
+				_streamingAssetsTreeView = new StreamingAssetsTreeView(_treeViewState);
+
+			_selectedPresetStreamingAssetsHierarchy = StreamingAssetsUtil.GetStreamingAssetsHierarchyByLists(_selectedPreset.IncludedStreamingAssets);
+			_streamingAssetsTreeView.SetStreamingAssetsHierarchy(_selectedPresetStreamingAssetsHierarchy);
 		}
 
 		private void OnGUI()
@@ -54,15 +76,22 @@ namespace Elevator89.BuildPresetter
 
 			GUILayout.Space(10);
 
-			string[] presetNames = _presets.AvailablePresets.Select(prst => prst.Name).ToArray();
+			EditorGUI.BeginChangeCheck();
+			_selectedPresetIndex = EditorGUILayout.Popup("Preset", _selectedPresetIndex, _presetNames);
+			if (EditorGUI.EndChangeCheck())
+			{
+				_selectedPreset = _presets.GetPreset(_presetNames[_selectedPresetIndex]);
+				_presets.ActivePresetName = _presetNames[_selectedPresetIndex];
 
-			int selectedPresetIndex = Array.IndexOf(presetNames, _presets.ActivePresetName);
-			selectedPresetIndex = EditorGUILayout.Popup("Preset", selectedPresetIndex, presetNames);
+				_selectedPresetStreamingAssetsHierarchy = StreamingAssetsUtil.GetStreamingAssetsHierarchyByLists(_selectedPreset.IncludedStreamingAssets);
+				_streamingAssetsTreeView.SetStreamingAssetsHierarchy(_selectedPresetStreamingAssetsHierarchy);
+			}
 
-			Preset selectedPreset = _presets.GetPreset(presetNames[selectedPresetIndex]);
-			_presets.ActivePresetName = selectedPreset.Name;
-
-			BuildMode buildMode = ShowBuildPresetsGuiAndReturnBuildPress(selectedPreset, selectedPreset.AppName);
+			BuildMode buildMode = BuildMode.DoNotBuild;
+			if (_selectedPreset != null)
+			{
+				buildMode = ShowBuildPresetsGuiAndReturnBuildPress(_selectedPreset, _selectedPreset.AppName);
+			}
 
 			GUILayout.Space(5);
 
@@ -84,10 +113,10 @@ namespace Elevator89.BuildPresetter
 			switch (buildMode)
 			{
 				case BuildMode.Build:
-					Builder.Build(selectedPreset, false, null);
+					Builder.Build(_selectedPreset, false, null);
 					break;
 				case BuildMode.BuildAndRun:
-					Builder.Build(selectedPreset, true, null);
+					Builder.Build(_selectedPreset, true, null);
 					break;
 				case BuildMode.DoNotBuild:
 				default:
@@ -237,15 +266,9 @@ namespace Elevator89.BuildPresetter
 						GUILayout.BeginVertical(GUILayout.ExpandWidth(true));
 						{
 							GUILayout.Label("Streaming assets:");
-
-							// ToDo: Consider using TreeView: https://docs.unity3d.com/Manual/TreeViewAPI.html
-							_scrollPosStreamingAssets = EditorGUILayout.BeginScrollView(_scrollPosStreamingAssets, EditorStyles.helpBox, GUILayout.ExpandWidth(true));
-							{
-								HierarchyAsset streamingAssetsHierarchy = StreamingAssetsUtil.GetStreamingAssetsHierarchyByLists(preset.IncludedStreamingAssets);
-								ShowStreamingAssetsFoldersAndFiles(0, parentIsIncluded: false, streamingAssetsHierarchy);
-								preset.IncludedStreamingAssets = StreamingAssetsUtil.GetAssetsListsByHierarchy(streamingAssetsHierarchy);
-							}
-							EditorGUILayout.EndScrollView();
+							
+							Rect controlRect = EditorGUILayout.GetControlRect(hasLabel: true, 0f, EditorStyles.helpBox, GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
+							_streamingAssetsTreeView.OnGUI(controlRect);
 						}
 						GUILayout.EndVertical();
 					}

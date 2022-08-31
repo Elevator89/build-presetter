@@ -19,10 +19,14 @@ namespace Elevator89.BuildPresetter
 
 	internal class StreamingAssetsTreeView : TreeView
 	{
-		private HierarchyAsset _hierarchy;
+		private HierarchyAsset _hierarchy = new HierarchyAsset(-1, "Default");
 
-		public StreamingAssetsTreeView(TreeViewState state, HierarchyAsset hierarchy)
-			: base(state)
+		public StreamingAssetsTreeView(TreeViewState state) : base(state)
+		{
+			Reload();
+		}
+
+		public void SetStreamingAssetsHierarchy(HierarchyAsset hierarchy)
 		{
 			_hierarchy = hierarchy;
 			Reload();
