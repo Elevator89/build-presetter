@@ -174,9 +174,10 @@ namespace Elevator89.BuildPresetter.UI
 						// ToDo: Consider using TreeView: https://docs.unity3d.com/Manual/TreeViewAPI.html
 						_scrollPosStreamingAssets = EditorGUILayout.BeginScrollView(_scrollPosStreamingAssets, EditorStyles.helpBox, GUILayout.ExpandWidth(true));
 						{
-							HierarchyAsset streamingAssetsHierarchy = StreamingAssetsUtil.GetStreamingAssetsHierarchyByLists(_preset.IncludedStreamingAssets);
-							ShowStreamingAssetsFoldersAndFiles(0, parentIsIncluded: false, streamingAssetsHierarchy);
-							_preset.IncludedStreamingAssets = StreamingAssetsUtil.GetAssetsListsByHierarchy(streamingAssetsHierarchy);
+							EditorGUI.BeginChangeCheck();
+							ShowStreamingAssetsFoldersAndFiles(0, parentIsIncluded: false, _selectedPresetStreamingAssetsHierarchy);
+							if (EditorGUI.EndChangeCheck())
+								_preset.IncludedStreamingAssets = StreamingAssetsUtil.GetAssetsListsByHierarchy(_selectedPresetStreamingAssetsHierarchy);
 						}
 						EditorGUILayout.EndScrollView();
 					}
@@ -265,20 +266,11 @@ namespace Elevator89.BuildPresetter.UI
 			style.contentOffset = new Vector2(nestingLevel * 20f, 0f);
 
 			GUI.enabled = !parentIsIncluded;
-			EditorGUI.BeginChangeCheck();
-
-			bool isIncluded = EditorGUILayout.ToggleLeft(hierarchyAsset.Name, hierarchyAsset.IsIncluded, style);
-
-			if (EditorGUI.EndChangeCheck())
-				hierarchyAsset.IsIncluded = isIncluded;
-
+			hierarchyAsset.IsIncluded = EditorGUILayout.ToggleLeft(hierarchyAsset.Name, hierarchyAsset.IsIncluded, style);
 			GUI.enabled = true;
 
-			if (hierarchyAsset.Children.Count > 0)
-			{
-				foreach (HierarchyAsset child in hierarchyAsset.Children)
-					ShowStreamingAssetsFoldersAndFiles(nestingLevel + 1, hierarchyAsset.IsIncluded, child);
-			}
+			foreach (HierarchyAsset child in hierarchyAsset.Children)
+				ShowStreamingAssetsFoldersAndFiles(nestingLevel + 1, hierarchyAsset.IsIncluded, child);
 		}
 	}
 }
