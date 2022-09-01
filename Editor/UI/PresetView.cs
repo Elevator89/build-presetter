@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using UnityEditor.IMGUI.Controls;
 using Elevator89.BuildPresetter.Data;
 using Elevator89.BuildPresetter.FolderHierarchy;
 
@@ -15,27 +14,24 @@ namespace Elevator89.BuildPresetter.UI
 
 		private Vector2 _scrollPosScenes;
 		private Vector2 _scrollPosResources;
+		private Vector2 _scrollPosStreamingAssets;
 
 		private Texture2D _iconTexture = null;
 
-		private string[] _existingSccenePaths = null;
+		private string[] _existingScenePaths = null;
 		private HashSet<string> _includedExistingScenesPaths = null;
 
-		private string[] _allResourcesFolders = null;
-		private HashSet<string> _includedResourcesFolders = null;
+		private string[] _existingResourcesFolderPaths = null;
+		private HashSet<string> _includedExistingResourcesFolderPaths = null;
 
 		[SerializeField]
 		private readonly object _splitterState = SplitterGUILayout.CreateSplitterState(new float[] { 33f, 33f, 33f }, new int[] { 50, 50, 50 }, null);
 
-		[SerializeField]
-		private TreeViewState _treeViewState; // Serialized in the window layout file so it survives assembly reloading
-		private StreamingAssetsTreeView _streamingAssetsTreeView;
 		private HierarchyAsset _selectedPresetStreamingAssetsHierarchy = null;
 
-		public PresetView()
+		public Preset GetPreset()
 		{
-			_treeViewState = new TreeViewState();
-			_streamingAssetsTreeView = new StreamingAssetsTreeView(_treeViewState);
+			return _preset;
 		}
 
 		public void SetPreset(Preset preset)
@@ -45,19 +41,28 @@ namespace Elevator89.BuildPresetter.UI
 			if (_preset != null)
 			{
 				_iconTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(_preset.AppIconPath);
-				_existingSccenePaths = Util.FindAllScenesPaths().ToArray();
-				_includedExistingScenesPaths = new HashSet<string>(_preset.IncludedScenes.Where(scenePath => _existingSccenePaths.Contains(scenePath)));
+				_existingScenePaths = Util.FindAllScenesPaths().ToArray();
+				_includedExistingScenesPaths = new HashSet<string>(_preset.IncludedScenes.Where(scenePath => _existingScenePaths.Contains(scenePath)));
 
-				_allResourcesFolders = Util.FindResourcesFolders(searchIncluded: true, searchExcluded: true).ToArray();
-				_includedResourcesFolders = new HashSet<string>(preset.IncludedResources.Where(path => _allResourcesFolders.Contains(path)));
+				_existingResourcesFolderPaths = Util.FindResourcesFolders(searchIncluded: true, searchExcluded: true).ToArray();
+				_includedExistingResourcesFolderPaths = new HashSet<string>(preset.IncludedResources.Where(path => _existingResourcesFolderPaths.Contains(path)));
 
 				_selectedPresetStreamingAssetsHierarchy = StreamingAssetsUtil.GetStreamingAssetsHierarchyByLists(_preset.IncludedStreamingAssets);
-				_streamingAssetsTreeView.SetStreamingAssetsHierarchy(_selectedPresetStreamingAssetsHierarchy);
 			}
 		}
 
 		public void OnGUI()
 		{
+			if (_preset == null)
+				return;
+
+			{
+				EditorGUI.BeginChangeCheck();
+				string name = EditorGUILayout.TextField("Preset Name", _preset.Name);
+				if (EditorGUI.EndChangeCheck())
+					_preset.Name = name;
+			}
+
 			GUILayout.BeginHorizontal(GUILayout.ExpandHeight(false));
 			{
 				GUILayout.BeginVertical(GUILayout.ExpandWidth(true));
@@ -110,7 +115,8 @@ namespace Elevator89.BuildPresetter.UI
 						GUILayout.Label("Scenes:");
 						_scrollPosScenes = EditorGUILayout.BeginScrollView(_scrollPosScenes, EditorStyles.helpBox);
 						{
-							foreach (string existingScenePath in _existingSccenePaths)
+							bool includedExistingScenesPathsWereChanged = false;
+							foreach (string existingScenePath in _existingScenePaths)
 							{
 								EditorGUI.BeginChangeCheck();
 								bool isSceneIncluded = EditorGUILayout.ToggleLeft(existingScenePath, _includedExistingScenesPaths.Contains(existingScenePath));
@@ -121,9 +127,12 @@ namespace Elevator89.BuildPresetter.UI
 									else
 										_includedExistingScenesPaths.Remove(existingScenePath);
 
-									_preset.IncludedScenes = _includedExistingScenesPaths.ToList();
+									includedExistingScenesPathsWereChanged = true;
 								}
 							}
+
+							if (includedExistingScenesPathsWereChanged)
+								_preset.IncludedScenes = _includedExistingScenesPaths.ToList();
 						}
 						EditorGUILayout.EndScrollView();
 					}
@@ -135,27 +144,43 @@ namespace Elevator89.BuildPresetter.UI
 
 						_scrollPosResources = EditorGUILayout.BeginScrollView(_scrollPosResources, EditorStyles.helpBox);
 						{
-							foreach (string resourcesFolder in _allResourcesFolders)
+							bool includedExistingResourcesFolderPathsWereChanged = false;
+							foreach (string existingResourcesFolderPath in _existingResourcesFolderPaths)
 							{
 								EditorGUI.BeginChangeCheck();
-								bool areResourcesIncluded = EditorGUILayout.ToggleLeft(resourcesFolder, _includedResourcesFolders.Contains(resourcesFolder));
+								bool areResourcesIncluded = EditorGUILayout.ToggleLeft(existingResourcesFolderPath, _includedExistingResourcesFolderPaths.Contains(existingResourcesFolderPath));
 								if (EditorGUI.EndChangeCheck())
 								{
 									if (areResourcesIncluded)
-										_includedResourcesFolders.Add(resourcesFolder);
+										_includedExistingResourcesFolderPaths.Add(existingResourcesFolderPath);
 									else
-										_includedResourcesFolders.Remove(resourcesFolder);
+										_includedExistingResourcesFolderPaths.Remove(existingResourcesFolderPath);
 
-									_preset.IncludedResources = _includedResourcesFolders.ToList();
+									includedExistingResourcesFolderPathsWereChanged = true;
 								}
 							}
+
+							if (includedExistingResourcesFolderPathsWereChanged)
+								_preset.IncludedResources = _includedExistingResourcesFolderPaths.ToList();
 						}
 						EditorGUILayout.EndScrollView();
 					}
 					GUILayout.EndVertical();
 
-					Rect controlRect = EditorGUILayout.GetControlRect(hasLabel: false, 0f, EditorStyles.helpBox, GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
-					_streamingAssetsTreeView.OnGUI(controlRect);
+					GUILayout.BeginVertical(GUILayout.ExpandWidth(true));
+					{
+						GUILayout.Label("Streaming assets:");
+
+						// ToDo: Consider using TreeView: https://docs.unity3d.com/Manual/TreeViewAPI.html
+						_scrollPosStreamingAssets = EditorGUILayout.BeginScrollView(_scrollPosStreamingAssets, EditorStyles.helpBox, GUILayout.ExpandWidth(true));
+						{
+							HierarchyAsset streamingAssetsHierarchy = StreamingAssetsUtil.GetStreamingAssetsHierarchyByLists(_preset.IncludedStreamingAssets);
+							ShowStreamingAssetsFoldersAndFiles(0, parentIsIncluded: false, streamingAssetsHierarchy);
+							_preset.IncludedStreamingAssets = StreamingAssetsUtil.GetAssetsListsByHierarchy(streamingAssetsHierarchy);
+						}
+						EditorGUILayout.EndScrollView();
+					}
+					GUILayout.EndVertical();
 				}
 				SplitterGUILayout.EndHorizontalSplit();
 			}
@@ -231,6 +256,28 @@ namespace Elevator89.BuildPresetter.UI
 				bool useIncrementalGC = EditorGUILayout.Toggle("Use incremental GC", _preset.UseIncrementalGC);
 				if (EditorGUI.EndChangeCheck())
 					_preset.ConnectWithProfiler = useIncrementalGC;
+			}
+		}
+
+		private void ShowStreamingAssetsFoldersAndFiles(int nestingLevel, bool parentIsIncluded, HierarchyAsset hierarchyAsset)
+		{
+			GUIStyle style = new GUIStyle(EditorStyles.label);
+			style.contentOffset = new Vector2(nestingLevel * 20f, 0f);
+
+			GUI.enabled = !parentIsIncluded;
+			EditorGUI.BeginChangeCheck();
+
+			bool isIncluded = EditorGUILayout.ToggleLeft(hierarchyAsset.Name, hierarchyAsset.IsIncluded, style);
+
+			if (EditorGUI.EndChangeCheck())
+				hierarchyAsset.IsIncluded = isIncluded;
+
+			GUI.enabled = true;
+
+			if (hierarchyAsset.Children.Count > 0)
+			{
+				foreach (HierarchyAsset child in hierarchyAsset.Children)
+					ShowStreamingAssetsFoldersAndFiles(nestingLevel + 1, hierarchyAsset.IsIncluded, child);
 			}
 		}
 	}

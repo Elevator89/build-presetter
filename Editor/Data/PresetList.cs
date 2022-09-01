@@ -16,9 +16,14 @@ namespace Elevator89.BuildPresetter.Data
 		[SerializeField]
 		public List<Preset> AvailablePresets;
 
-		public Preset GetPreset(string platformName)
+		public Preset GetPreset(int presetIndex)
 		{
-			return AvailablePresets.Find(settings => settings.Name == platformName);
+			return AvailablePresets[presetIndex];
+		}
+
+		public Preset GetPreset(string presetName)
+		{
+			return AvailablePresets.Find(preset => preset.Name == presetName);
 		}
 
 		public void SetPreset(Preset configuration)

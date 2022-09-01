@@ -12,6 +12,20 @@ namespace Elevator89.BuildPresetter
 {
 	public static class Builder
 	{
+		[MenuItem("Build/Build with Acive Preset", isValidateFunction: false, 100)]
+		private static void BuildWithAcivePreset()
+		{
+			PresetList presets = PresetList.Load();
+			Builder.Build(presets.GetPreset(presets.ActivePresetName), false, null);
+		}
+
+		[MenuItem("Build/Build and Run with Acive Preset", isValidateFunction: false, 100)]
+		private static void BuildAndRunWithAciveConfiguration()
+		{
+			PresetList presets = PresetList.Load();
+			Builder.Build(presets.GetPreset(presets.ActivePresetName), true, null);
+		}
+
 		/// <summary>
 		/// This method is called from CI system
 		/// </summary>
