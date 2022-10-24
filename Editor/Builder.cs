@@ -52,7 +52,7 @@ namespace Elevator89.BuildPresetter
 			}
 
 			// Don't exit if the test run is required
-			Build(preset, false, version, rollbackPreset: false);
+			Build(preset, false, version, rollbackPresetChange: false);
 			if (!runTests)
 				// Tests run closes the application automatically
 				EditorApplication.Exit(0);
